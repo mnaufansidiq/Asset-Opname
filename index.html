@@ -48,6 +48,10 @@ textarea{width:100%;font:inherit;color:var(--tx);background:var(--card);border:1
 .foto input{width:100%;margin-top:6px;padding:5px 8px;font-size:13px}
 .foto .x{position:absolute;top:10px;right:10px;padding:1px 8px;border-radius:99px;background:var(--card);font-weight:700}
 .foto .no{position:absolute;top:10px;left:10px;padding:0 8px;border-radius:99px;background:var(--pr);color:var(--prt);font-size:12px;font-weight:700}
+.rtb{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.rtb button{padding:4px 10px;font-size:13px}
+.rte{min-height:90px;max-height:300px;overflow:auto;border:1px solid var(--bd);border-radius:8px;padding:8px 12px;background:var(--card);outline:none}
+.rte:focus{border-color:var(--pr)}.rte:empty:before{content:attr(data-ph);color:var(--mu);pointer-events:none}
+.rte ul,.rte ol{margin:4px 0;padding-left:24px}.rte ul{list-style:disc}.rte ol{list-style:decimal}
 details.card summary{cursor:pointer;font-weight:600}
 .hide{display:none}.mu{color:var(--mu);font-size:13px}
 </style>
@@ -75,8 +79,9 @@ details.card summary{cursor:pointer;font-weight:600}
   <div class="grid2">
     <div><label>Tanggal Opname</label><input type="date" id="rTgl1" style="width:100%"></div>
   </div>
-  <div style="margin:4px 0 12px"><label>Keterangan tambahan keseluruhan (opsional, tidak dicetak sendiri di Word, hanya diuraikan AI ke dalam kesimpulan)</label>
-    <textarea id="rNote" rows="3" placeholder="mis. Sebagian AC di Ruang Rapat sedang dalam perbaikan; Genset di Gudang dipindahkan ke unit lain bulan lalu…"></textarea></div>
+  <div style="margin:4px 0 12px"><label>Keterangan tambahan keseluruhan (opsional, bisa pakai poin / nomor urut; tidak dicetak sendiri di Word, hanya diuraikan AI ke dalam kesimpulan)</label>
+    <div class="rtb"><button type="button" data-cmd="insertUnorderedList" title="Daftar poin">• Poin</button><button type="button" data-cmd="insertOrderedList" title="Daftar bernomor">1. Nomor</button><button type="button" data-cmd="indent" title="Geser ke dalam (Tab)">→ Menjorok</button><button type="button" data-cmd="outdent" title="Geser ke luar (Shift+Tab)">← Keluar</button></div>
+    <div id="rNote" class="rte" contenteditable="true" data-ph="mis. 1. Sebagian AC di Ruang Rapat sedang diperbaiki&#10;2. Genset di Gudang sudah dipindahkan ke unit lain"></div></div>
   <div class="row">
     <select id="rLvl"><option value="ringkas">Kesimpulan ringkas</option><option value="standar" selected>Kesimpulan standar</option><option value="detail">Kesimpulan detail</option></select>
     <button id="aiBtn" class="p">✨ Generate Kesimpulan (AI)</button>
@@ -237,10 +242,52 @@ $('exp1').onclick=goReport;$('exp2').onclick=goReport;
 const WORKER_URL='https://so-proxy.mnaufansidiq.workers.dev/';
 const RK='opname2:rep';
 const cv=(s,r,k)=>s.m[k]>=0?r[s.m[k]]:'';
-const RF=['rTgl1','rNote','rKes'];
-(function(){try{const d=JSON.parse(LS.get(RK)||'{}');RF.forEach(i=>{if(d[i])$(i).value=d[i];});}catch(e){}
+const RF=['rTgl1','rKes'];
+const saveRep=()=>{const d={};RF.forEach(x=>d[x]=$(x).value);d.rNote=rteText($('rNote'));LS.set(RK,JSON.stringify(d));};
+(function(){try{const d=JSON.parse(LS.get(RK)||'{}');RF.forEach(i=>{if(d[i])$(i).value=d[i];});if(d.rNote)$('rNote').innerHTML=textToRte(d.rNote);}catch(e){}
   if(!$('rTgl1').value)$('rTgl1').value=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);})();
-RF.forEach(i=>$(i).addEventListener('input',()=>{const d={};RF.forEach(x=>d[x]=$(x).value);LS.set(RK,JSON.stringify(d));}));
+RF.forEach(i=>$(i).addEventListener('input',saveRep));$('rNote').addEventListener('input',saveRep);
+/* editor poin / nomor */
+function rteText(root){
+  const out=[];let buf='';
+  const flush=d=>{const t=buf.replace(/ /g,' ').trim();if(t)out.push('  '.repeat(d)+t);buf='';};
+  const walk=(el,d)=>{
+    for(const c of el.childNodes){
+      if(c.nodeType===3){buf+=c.textContent;continue;}
+      if(c.nodeType!==1)continue;
+      const tg=c.tagName;
+      if(tg==='BR'){flush(d);continue;}
+      if(tg==='UL'||tg==='OL'){flush(d);let n=0;
+        for(const li of c.children){if(li.tagName!=='LI')continue;n++;let own='';const subs=[];
+          li.childNodes.forEach(k=>{if(k.nodeType===1&&/^(UL|OL)$/.test(k.tagName))subs.push(k);else own+=k.textContent;});
+          out.push('  '.repeat(d)+(tg==='OL'?n+'. ':'- ')+own.replace(/ /g,' ').trim());
+          subs.forEach(sl=>{const tmp=document.createElement('div');tmp.appendChild(sl.cloneNode(true));walk(tmp,d+1);});}
+        continue;}
+      if(/^(DIV|P)$/.test(tg)){flush(d);if(c.querySelector('ul,ol'))walk(c,d);else{buf=c.textContent;flush(d);}continue;}
+      buf+=c.textContent;
+    }
+    flush(d);
+  };
+  walk(root,0);return out.join('\n');
+}
+function textToRte(t){
+  let html='';const stack=[];
+  const close=()=>{while(stack.length)html+='</li></'+stack.pop()+'>';};
+  for(const raw of t.split('\n')){
+    const m=raw.match(/^(\s*)(?:(\d+)\.|-)\s+(.*)$/);
+    if(!m){close();if(raw.trim())html+='<div>'+esc(raw.trim())+'</div>';continue;}
+    const lvl=Math.floor(m[1].length/2),tag=m[2]?'ol':'ul';
+    while(stack.length>lvl+1)html+='</li></'+stack.pop()+'>';
+    if(stack.length===lvl+1){html+='</li>';if(stack[lvl]!==tag){html+='</'+stack.pop()+'><'+tag+'>';stack.push(tag);}}
+    else{while(stack.length<=lvl){stack.push(tag);html+='<'+tag+'>';}}
+    html+='<li>'+esc(m[3]);
+  }
+  close();return html;
+}
+document.querySelectorAll('.rtb button').forEach(b=>{b.addEventListener('mousedown',e=>e.preventDefault());
+  b.addEventListener('click',()=>{$('rNote').focus();document.execCommand(b.dataset.cmd);saveRep();});});
+$('rNote').addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();document.execCommand(e.shiftKey?'outdent':'indent');}});
+$('rNote').addEventListener('paste',e=>{e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain')||'');});
 const fmtD=v=>{if(!v)return'';const [y,m,d]=v.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});};
 const periodeText=()=>fmtD($('rTgl1').value)||'-';
 
@@ -262,7 +309,7 @@ function buildPrompt(){
   if(!T.length)d+='(tidak ada temuan)\n';
   T.slice(0,60).forEach(t=>{d+='- ['+t.status+'] '+t.ruang+' — '+t.nama+(t.kode?' ('+t.kode+')':'')+(t.jml!==''?', jumlah '+t.jml:'')+(t.cat?'. Catatan: '+t.cat:'')+'\n';});
   if(T.length>60)d+='(dan '+(T.length-60)+' temuan lainnya)\n';
-  const note=$('rNote').value.trim();
+  const note=rteText($('rNote')).trim();
   if(note)d+='\nKETERANGAN TAMBAHAN DARI PETUGAS:\n'+note+'\n';
   const lv=$('rLvl').value;
   const gaya=lv==='ringkas'?'RINGKAS — tiap poin 1 kalimat pendek dan langsung ke inti.':lv==='detail'?'DETAIL — tiap poin boleh 1-2 kalimat yang menjelaskan konteks dan implikasinya, tetap hanya berdasar data.':'STANDAR — tiap poin berupa kalimat lengkap dan deskriptif dengan konteks secukupnya.';
