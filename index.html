@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Checklist Verifikasi Asset Opname</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js"></script>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#6b7280;--bd:#e2e5ea;--pr:#0f766e;--prt:#fff;--ok:#15803d;--wn:#b45309;--er:#b91c1c;--okb:#dcfce7;--wnb:#fef3c7;--erb:#fee2e2;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171a;--card:#1d2125;--tx:#e6e8eb;--mu:#9aa3ad;--bd:#2d333a;--pr:#2dd4bf;--prt:#06231f;--ok:#4ade80;--wn:#fbbf24;--er:#f87171;--okb:#14351f;--wnb:#3a2e0e;--erb:#3d1a1a}}
+:root[data-theme="dark"]{--bg:#14171a;--card:#1d2125;--tx:#e6e8eb;--mu:#9aa3ad;--bd:#2d333a;--pr:#2dd4bf;--prt:#06231f;--ok:#4ade80;--wn:#fbbf24;--er:#f87171;--okb:#14351f;--wnb:#3a2e0e;--erb:#3d1a1a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:18px;margin:0}.sub{color:var(--mu);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+button,select,input[type=text],input[type=date]{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:7px 10px}
+button{cursor:pointer}button.p{background:var(--pr);border-color:var(--pr);color:var(--prt);font-weight:600}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.sb{justify-content:space-between}
+.bar{height:8px;background:var(--bd);border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:var(--pr)}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.chip{padding:3px 10px;border-radius:99px;font-size:13px;background:var(--bd)}
+.tools{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:8px 0;display:flex;gap:8px;flex-wrap:wrap}
+.tools input{flex:1;min-width:150px}
+.rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.room{text-align:left;padding:12px;border-radius:12px;display:block;width:100%}
+.room b{display:block;overflow-wrap:anywhere}.room small{color:var(--mu)}.room .bar{margin-top:8px}
+.room.done{border-color:var(--ok)}
+.tw{overflow-x:auto;background:var(--card);border:1px solid var(--bd);border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:860px}
+th{background:var(--bg);text-align:left;font-size:12px;color:var(--mu);padding:8px 10px;white-space:nowrap}
+td{padding:8px 10px;border-top:1px solid var(--bd);vertical-align:middle;overflow-wrap:anywhere}
+tr.gh td{background:var(--bg);font-weight:600;border-top:1px solid var(--bd)}tr.gh small{color:var(--mu);font-weight:400;margin-left:8px}
+tr.s-ok td:first-child{box-shadow:inset 4px 0 var(--ok)}tr.s-rusak td:first-child{box-shadow:inset 4px 0 var(--wn)}tr.s-hilang td:first-child{box-shadow:inset 4px 0 var(--er)}
+.acts{display:flex;gap:6px;flex-wrap:nowrap}.acts button{padding:4px 8px;font-size:13px;white-space:nowrap}
+.acts button.on.ok{background:var(--okb);border-color:var(--ok);color:var(--ok)}
+.acts button.on.rusak{background:var(--wnb);border-color:var(--wn);color:var(--wn)}
+.acts button.on.hilang{background:var(--erb);border-color:var(--er);color:var(--er)}
+td input[type=text]{width:100%;min-width:130px;padding:5px 8px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0}
+label{display:block;font-size:12px;color:var(--mu);margin-bottom:3px}
+.chk{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--tx);margin:6px 0 12px}
+textarea{width:100%;font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:9px 10px;margin:10px 0 4px;resize:vertical}
+details.card summary{cursor:pointer;font-weight:600}
+.hide{display:none}.mu{color:var(--mu);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div id="setup">
+  <h1>Checklist Verifikasi Asset Opname</h1>
+  <p class="sub">Upload Excel aset. Setiap sheet dianggap satu ruang, kolom dibaca otomatis. Anda tinggal memilih ruangnya.</p>
+  <div class="card">
+    <div class="row"><input type="file" id="file" accept=".xlsx,.xls,.csv"><button id="demo">Pakai data contoh</button></div>
+    <div id="resumeBox" class="hide" style="margin-top:12px"><button id="resume" class="p"></button></div>
+  </div>
+</div>
+
+<div id="rooms" class="hide">
+  <div class="card">
+    <div class="row sb"><h2>Pilih Ruang</h2>
+      <div class="row"><button id="exp1" class="p">📄 Export Word</button><button id="reset">Reset</button></div></div>
+    <p class="mu" id="ptxt1" style="margin:8px 0 6px"></p>
+    <div class="bar"><i id="pbar1" style="width:0"></i></div>
+  </div>
+  <details class="card" id="rep"><summary>📄 Export Word &amp; Kesimpulan AI</summary>
+  <div class="grid2">
+    <div><label>Tanggal Opname</label><input type="date" id="rTgl1" style="width:100%"></div>
+  </div>
+  <div class="row">
+    <select id="rLvl"><option value="ringkas">Kesimpulan ringkas</option><option value="standar" selected>Kesimpulan standar</option><option value="detail">Kesimpulan detail</option></select>
+    <button id="aiBtn" class="p">✨ Generate Kesimpulan (AI)</button>
+  </div>
+  <textarea id="rKes" rows="9" placeholder="Kesimpulan dari AI muncul di sini dan bisa Anda edit sebelum diunduh. Boleh juga ditulis manual."></textarea>
+  <p class="mu" id="aiInfo" style="margin:0 0 12px"></p>
+  <button id="docBtn" class="p">📄 Unduh Laporan Word (.docx)</button>
+</details>
+<div class="tools"><input type="text" id="rq" placeholder="Cari ruang…"></div>
+  <div class="rooms" id="rlist"></div>
+</div>
+
+<div id="room" class="hide">
+  <div class="card">
+    <div class="row sb"><div class="row"><button id="back">&larr; Pilih Ruang</button><h2 id="rname"></h2></div>
+      <div class="row"><button id="savebtn" class="p">💾 Simpan</button></div></div>
+    <p class="mu" id="ptxt2" style="margin:8px 0 6px"></p>
+    <div class="bar"><i id="pbar2" style="width:0"></i></div>
+    <div class="stats" id="stats"></div>
+  </div>
+  <div class="tools">
+    <input type="text" id="q" placeholder="Cari no. asset / nama…">
+    <select id="f"><option value="">Semua status</option><option value="belum">Belum dicek</option><option value="ok">Ada &amp; baik</option><option value="rusak">Rusak</option><option value="hilang">Tidak ditemukan</option></select>
+    <button id="exp2" class="p">📄 Export Word</button>
+  </div>
+  <div id="tbl"></div>
+</div>
+
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let SH=[],cfg={},st={},nt={},ts={},cur=-1,fname='';
+const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LBL={ok:'Ada & baik',rusak:'Rusak',hilang:'Tidak ditemukan'};
+const fmtDate=v=>{if(typeof v==='number'&&v>20000&&v<80000)return new Date(Math.round((v-25569)*864e5)).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'});return v instanceof Date?v.toLocaleDateString('id-ID'):String(v??'');};
+const show=id=>{['setup','rooms','room'].forEach(x=>$(x).classList.toggle('hide',x!==id));window.scrollTo(0,0);};
+
+/* ---------- deteksi kolom otomatis per sheet ---------- */
+const RX={tgl:/tanggal|tgl|perolehan|date/i,jml:/jumlah|jml|qty|kuantitas|banyak|volume/i,ket:/keterangan|klasifikasi|kategori|jenis|kelompok|golongan/i,kode:/kode|no\.?\s*ass?et|nomor|inventaris|\bid\b/i,nama:/nama|deskripsi|uraian|barang|ass?et/i};
+const ORDER=['tgl','jml','ket','kode','nama'];
+function detect(aoa){
+  let hi=0,bs=-1;
+  for(let i=0;i<Math.min(10,aoa.length);i++){const sc=aoa[i].filter(c=>Object.values(RX).some(r=>r.test(String(c)))).length;if(sc>bs){bs=sc;hi=i;}}
+  const h=(aoa[hi]||[]).map((x,i)=>String(x||'').trim()||('Kolom '+(i+1)));
+  const used=new Set(),m={};
+  ORDER.forEach(f=>{const i=h.findIndex((x,j)=>!used.has(j)&&RX[f].test(x));m[f]=i;if(i>=0)used.add(i);});
+  ['kode','nama'].forEach(f=>{if(m[f]<0){const i=h.findIndex((x,j)=>!used.has(j));m[f]=i;if(i>=0)used.add(i);}});
+  return {hi,h,m};
+}
+function openWb(wb,name){
+  SH=[];
+  wb.SheetNames.forEach(n=>{
+    const a=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:''});if(!a.length)return;
+    const d=detect(a),rows=a.slice(d.hi+1).filter(r=>r.some(c=>String(c).trim()!==''));
+    if(rows.length)SH.push({name:n,hdr:d.h,m:d.m,rows});});
+  if(!SH.length){alert('Tidak ada data di file ini.');return;}
+  fname=name;cfg={key:'opname2:'+name+':'+SH.map(s=>s.name+s.rows.length).join('|')};
+  loadProg();sessSave();goRooms();
+}
+$('file').onchange=async e=>{const f=e.target.files[0];if(!f)return;openWb(XLSX.read(await f.arrayBuffer(),{type:'array'}),f.name);};
+$('demo').onclick=()=>{
+  const mk=(pre,items)=>[['No Asset','Nama Asset','Jumlah','Tanggal Perolehan'],...items.map((x,i)=>[pre+String(i+1).padStart(3,'0'),x[0],x[1],43000+i*211])];
+  const sh={'Ruang Rapat':mk('RR-',[['Meja Rapat',1],['Kursi Rapat',12],['Proyektor',1],['AC Daikin',2]]),
+            'Ruang Direksi':mk('RD-',[['Meja Direktur',1],['Sofa Tamu',1],['TV LED 43"',1]]),
+            'Gudang':mk('GD-',[['Rak Besi',6],['Troli',2],['Genset',1]])};
+  const w={SheetNames:Object.keys(sh),Sheets:{}};for(const k in sh)w.Sheets[k]=XLSX.utils.aoa_to_sheet(sh[k]);
+  openWb(w,'contoh.xlsx');};
+
+/* ---------- state & simpan ---------- */
+const K=(si,i)=>si+'_'+i;
+const loadProg=()=>{st={};nt={};ts={};try{const s=JSON.parse(LS.get(cfg.key)||'null');if(s){st=s.st||{};nt=s.nt||{};ts=s.ts||{};}}catch(e){}};
+const save=()=>LS.set(cfg.key,JSON.stringify({st,nt,ts}));
+const sessSave=()=>LS.set('opname2:last',JSON.stringify({cfg,SH,fname}));
+function showResume(){try{const s=JSON.parse(LS.get('opname2:last')||'null');if(!s||!s.SH)return;
+  const d=Object.keys(JSON.parse(LS.get(s.cfg.key)||'{"st":{}}').st||{}).length,t=s.SH.reduce((a,x)=>a+x.rows.length,0);
+  $('resume').textContent='▶ Lanjutkan: '+s.fname+' ('+d+'/'+t+' sudah dicek)';$('resumeBox').classList.remove('hide');}catch(e){}}
+$('resume').onclick=()=>{try{const s=JSON.parse(LS.get('opname2:last'));cfg=s.cfg;SH=s.SH;fname=s.fname;loadProg();goRooms();}catch(e){}};
+
+/* ---------- pilih ruang (= sheet) ---------- */
+function goRooms(){cur=-1;show('rooms');renderRooms();}
+const doneIn=si=>SH[si].rows.filter((r,i)=>st[K(si,i)]).length;
+function renderRooms(){
+  const q=$('rq').value.toLowerCase();let tot=0,d=0;
+  $('rlist').innerHTML=SH.map((s,si)=>{const n=s.rows.length,dn=doneIn(si);tot+=n;d+=dn;
+    if(q&&!s.name.toLowerCase().includes(q))return'';
+    return `<button class="room ${dn===n?'done':''}" data-r="${si}"><b>${esc(s.name)}</b><small>${dn}/${n} aset ${dn===n?'· selesai ✓':''}</small><div class="bar"><i style="width:${Math.round(dn/n*100)}%"></i></div></button>`;}).join('')||'<div class="card">Ruang tidak ditemukan.</div>';
+  $('ptxt1').textContent=`${SH.length} ruang · ${d} dari ${tot} aset sudah dicek (${tot?Math.round(d/tot*100):0}%)`;
+  $('pbar1').style.width=(tot?d/tot*100:0)+'%';
+}
+$('rq').oninput=renderRooms;
+$('rlist').onclick=e=>{const b=e.target.closest('[data-r]');if(!b)return;cur=+b.dataset.r;$('q').value='';$('f').value='';show('room');renderRoom();};
+
+/* ---------- tabel per ruang ---------- */
+function renderRoom(){
+  const S=SH[cur],m=S.m,c=(r,k)=>m[k]>=0?r[m[k]]:'';
+  $('rname').textContent=S.name;
+  const all=S.rows.map((r,i)=>i);
+  const q=$('q').value.toLowerCase(),f=$('f').value;
+  const vis=all.filter(i=>{const r=S.rows[i],s=st[K(cur,i)]||'belum';if(f&&s!==f)return false;
+    return !q||(c(r,'kode')+' '+c(r,'nama')).toLowerCase().includes(q);});
+  const gk=r=>m.ket>=0?(String(c(r,'ket')).trim()||'(Tanpa keterangan)'):'';
+  const G={};vis.forEach(i=>{(G[gk(S.rows[i])]=G[gk(S.rows[i])]||[]).push(i);});
+  let h='<div class="tw"><table><thead><tr><th>No</th><th>No. Asset</th><th>Nama Asset</th><th>Jumlah</th><th>Tgl Perolehan</th><th>Status</th><th>Catatan</th></tr></thead><tbody>',n=0;
+  Object.keys(G).sort().forEach(g=>{
+    if(g){const a2=all.filter(i=>gk(S.rows[i])===g);h+=`<tr class="gh"><td colspan="7">${esc(g)}<small>${a2.filter(i=>st[K(cur,i)]).length}/${a2.length} dicek</small></td></tr>`;}
+    G[g].forEach(i=>{const r=S.rows[i],s=st[K(cur,i)]||'';n++;
+      h+=`<tr class="${s?'s-'+s:''}"><td>${n}</td><td>${esc(c(r,'kode'))}</td><td><strong>${esc(c(r,'nama'))}</strong></td><td>${m.jml>=0?esc(c(r,'jml')):'-'}</td><td>${m.tgl>=0?esc(fmtDate(c(r,'tgl'))):'-'}</td>
+      <td><div class="acts">${['ok','rusak','hilang'].map(x=>`<button class="${x} ${s===x?'on':''}" data-i="${i}" data-s="${x}">${x==='ok'?'✓ ':x==='rusak'?'⚠ ':'✗ '}${LBL[x]}</button>`).join('')}</div></td>
+      <td><input type="text" data-n="${i}" placeholder="Catatan…" value="${esc(nt[K(cur,i)]||'')}"></td></tr>`;});});
+  $('tbl').innerHTML=n?h+'</tbody></table></div>':'<div class="card">Tidak ada aset yang cocok.</div>';
+  const cn={ok:0,rusak:0,hilang:0};all.forEach(i=>{const s=st[K(cur,i)];if(s)cn[s]++;});const d=cn.ok+cn.rusak+cn.hilang;
+  $('ptxt2').textContent=`Progres ruang: ${d} dari ${all.length} aset (${all.length?Math.round(d/all.length*100):0}%)`;
+  $('pbar2').style.width=(all.length?d/all.length*100:0)+'%';
+  $('stats').innerHTML=`<span class="chip">Ada &amp; baik: ${cn.ok}</span><span class="chip">Rusak: ${cn.rusak}</span><span class="chip">Tidak ditemukan: ${cn.hilang}</span><span class="chip">Belum: ${all.length-d}</span>`;
+}
+$('tbl').onclick=e=>{const b=e.target.closest('button[data-i]');if(!b)return;const k=K(cur,b.dataset.i),s=b.dataset.s;
+  if(st[k]===s){delete st[k];delete ts[k];}else{st[k]=s;ts[k]=new Date().toLocaleString('id-ID');}
+  save();renderRoom();};
+$('tbl').oninput=e=>{const i=e.target.dataset.n;if(i===undefined)return;nt[K(cur,i)]=e.target.value;save();};
+$('q').oninput=renderRoom;$('f').onchange=renderRoom;
+$('back').onclick=()=>{save();goRooms();};
+$('savebtn').onclick=()=>{const b=$('savebtn');save();sessSave();
+  b.textContent='✓ Tersimpan '+new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  setTimeout(()=>b.textContent='💾 Simpan',2500);};
+
+/* ---------- reset (2x klik) ---------- */
+let rt=null;
+$('reset').onclick=()=>{const b=$('reset');
+  if(!rt){b.textContent='Yakin? Klik lagi untuk hapus';b.style.borderColor='var(--er)';b.style.color='var(--er)';
+    rt=setTimeout(()=>{rt=null;b.textContent='Reset';b.style.borderColor='';b.style.color='';},4000);return;}
+  clearTimeout(rt);rt=null;b.textContent='Reset';b.style.borderColor='';b.style.color='';
+  LS.del(cfg.key);LS.del('opname2:last');st={};nt={};ts={};SH=[];
+  $('file').value='';$('resumeBox').classList.add('hide');show('setup');};
+
+/* ---------- export: satu sheet per ruang ---------- */
+async function exportXlsx(){
+  const w=XLSX.utils.book_new(),sm=[['Ruang','Total','Ada & baik','Rusak','Tidak ditemukan','Belum']];
+  SH.forEach((s,si)=>{
+    const out=[[...s.hdr,'Status Verifikasi','Catatan','Waktu Cek']],c=[s.rows.length,0,0,0,0];
+    s.rows.forEach((r,i)=>{const k=K(si,i);out.push([...s.hdr.map((_,j)=>r[j]??''),LBL[st[k]]||'Belum dicek',nt[k]||'',ts[k]||'']);c[{ok:1,rusak:2,hilang:3}[st[k]]||4]++;});
+    XLSX.utils.book_append_sheet(w,XLSX.utils.aoa_to_sheet(out),s.name.slice(0,31));sm.push([s.name,...c]);});
+  XLSX.utils.book_append_sheet(w,XLSX.utils.aoa_to_sheet(sm),'Ringkasan');
+  const data=XLSX.write(w,{type:'array',bookType:'xlsx'}),name='hasil-opname-'+new Date().toISOString().slice(0,10)+'.xlsx';
+  try{const dl=window.claude&&await window.claude.use('downloads');if(dl){await dl.save({filename:name,data});return;}}
+  catch(e){if(e&&e.code==='declined')return;}
+  XLSX.writeFile(w,name);
+}
+const goReport=()=>{if(cur>=0){save();goRooms();}$('rep').open=true;setTimeout(()=>$('rep').scrollIntoView({behavior:'smooth',block:'start'}),50);};
+$('exp1').onclick=goReport;$('exp2').onclick=goReport;
+
+/* ================= LAPORAN WORD + KESIMPULAN AI ================= */
+/* URL Cloudflare Worker Anda (POST {prompt} -> {text,provider,modelUsed,elapsedMs}) */
+const WORKER_URL='https://so-proxy.mnaufansidiq.workers.dev/';
+const RK='opname2:rep';
+const cv=(s,r,k)=>s.m[k]>=0?r[s.m[k]]:'';
+const RF=['rTgl1','rKes'];
+(function(){try{const d=JSON.parse(LS.get(RK)||'{}');RF.forEach(i=>{if(d[i])$(i).value=d[i];});}catch(e){}
+  if(!$('rTgl1').value)$('rTgl1').value=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);})();
+RF.forEach(i=>$(i).addEventListener('input',()=>{const d={};RF.forEach(x=>d[x]=$(x).value);LS.set(RK,JSON.stringify(d));}));
+const fmtD=v=>{if(!v)return'';const [y,m,d]=v.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});};
+const periodeText=()=>fmtD($('rTgl1').value)||'-';
+
+function statsRuang(){return SH.map((s,si)=>{const c={name:s.name,n:s.rows.length,ok:0,rusak:0,hilang:0,belum:0};
+  s.rows.forEach((r,i)=>{c[st[K(si,i)]||'belum']++;});return c;});}
+function listTemuan(all){const L=[];
+  SH.forEach((s,si)=>s.rows.forEach((r,i)=>{const x=st[K(si,i)];
+    if(all||x==='rusak'||x==='hilang')L.push({ruang:s.name,kode:cv(s,r,'kode'),nama:cv(s,r,'nama'),jml:cv(s,r,'jml'),
+      tgl:s.m.tgl>=0?fmtDate(cv(s,r,'tgl')):'',status:LBL[x]||'Belum dicek',cat:nt[K(si,i)]||''});}));return L;}
+
+function buildPrompt(){
+  const S=statsRuang(),T=listTemuan(false);
+  const tot=S.reduce((a,x)=>({n:a.n+x.n,ok:a.ok+x.ok,rusak:a.rusak+x.rusak,hilang:a.hilang+x.hilang,belum:a.belum+x.belum}),{n:0,ok:0,rusak:0,hilang:0,belum:0});
+  let d='DATA LAPORAN VERIFIKASI ASSET OPNAME\n';
+  d+='Periode/Tanggal: '+periodeText()+'\n\n';
+  d+='Total: '+S.length+' ruang, '+tot.n+' aset. Ada & baik: '+tot.ok+', Rusak: '+tot.rusak+', Tidak ditemukan: '+tot.hilang+', Belum diverifikasi: '+tot.belum+'.\n\nRincian per ruang:\n';
+  S.forEach((c,i)=>{d+=(i+1)+'. '+c.name+': total '+c.n+' aset (baik '+c.ok+', rusak '+c.rusak+', tidak ditemukan '+c.hilang+', belum dicek '+c.belum+')\n';});
+  d+='\nDaftar temuan (rusak / tidak ditemukan):\n';
+  if(!T.length)d+='(tidak ada temuan)\n';
+  T.slice(0,60).forEach(t=>{d+='- ['+t.status+'] '+t.ruang+' — '+t.nama+(t.kode?' ('+t.kode+')':'')+(t.jml!==''?', jumlah '+t.jml:'')+(t.cat?'. Catatan: '+t.cat:'')+'\n';});
+  if(T.length>60)d+='(dan '+(T.length-60)+' temuan lainnya)\n';
+  const lv=$('rLvl').value;
+  const gaya=lv==='ringkas'?'RINGKAS — tiap poin 1 kalimat pendek dan langsung ke inti.':lv==='detail'?'DETAIL — tiap poin boleh 1-2 kalimat yang menjelaskan konteks dan implikasinya, tetap hanya berdasar data.':'STANDAR — tiap poin berupa kalimat lengkap dan deskriptif dengan konteks secukupnya.';
+  return 'Anda adalah asisten penyusun laporan pengawasan internal berbahasa Indonesia yang formal. '
+   +'Berdasarkan data verifikasi asset opname berikut, tulis ISI bagian kesimpulan laporan dengan format PERSIS seperti ini:\n'
+   +'0) JANGAN menulis kata "KESIMPULAN" atau judul apa pun di awal, langsung mulai dengan paragraf pembuka.\n'
+   +'1) Satu paragraf pembuka 3-4 kalimat yang merangkum garis besar hasil: periode, cakupan ruang dan jumlah aset, kondisi umum, serta angka temuan. WAJIB sebut hal spesifik dari data (nama ruang, angka). DILARANG kalimat template kosong.\n'
+   +'2) Beri SATU baris kosong, lalu tulis poin-poin (tiap poin diawali "- "): ruang yang menonjol, aset rusak / tidak ditemukan yang penting (sebut nama aset dan ruangnya), serta arahan tindak lanjut. Gaya poin: '+gaya+' Jika ada aset belum diverifikasi, sebut sebagai catatan. Jumlah poin secukupnya sesuai data.\n'
+   +'3) Paragraf pembuka DAN poin-poin harus sama-sama ada, dan jawaban harus selesai utuh, tidak terpotong.\n'
+   +'Gunakan gaya laporan resmi. JANGAN pakai markdown (tanpa **, heading, atau penomoran), hanya paragraf biasa dan baris "- ". Jangan mengarang data yang tidak ada di bawah ini.\n\n'+d;
+}
+async function callAI(prompt,timeoutMs=35000){
+  let last;
+  for(let a=1;a<=2;a++){
+    const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),timeoutMs);
+    try{
+      const res=await fetch(WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt}),signal:ctl.signal});
+      clearTimeout(t);let data=null;try{data=await res.json();}catch(e){}
+      if(!res.ok){if(a===1&&(res.status===429||res.status>=500)){await new Promise(r=>setTimeout(r,800));continue;}
+        throw new Error(data&&data.error?data.error:'Worker mengembalikan status '+res.status);}
+      const text=(data&&data.text||'').trim();if(!text)throw new Error('AI tidak memberikan hasil.');
+      return {text,provider:data.provider||'?',model:data.modelUsed||'?',ms:data.elapsedMs};
+    }catch(e){clearTimeout(t);
+      last=e.name==='AbortError'?new Error('AI tidak merespons (timeout '+timeoutMs/1000+' detik).'):e;
+      if(a===1&&!/^Worker/.test(last.message))continue;break;}
+  }
+  throw last;
+}
+let aiBusy=false;
+$('aiBtn').onclick=async()=>{
+  if(aiBusy)return;
+  if(!Object.keys(st).length&&!confirm('Belum ada aset yang diverifikasi. Tetap generate kesimpulan?'))return;
+  const b=$('aiBtn');aiBusy=true;b.disabled=true;b.textContent='⏳ AI sedang menyusun...';$('aiInfo').textContent='';
+  try{
+    const r=await callAI(buildPrompt());
+    $('rKes').value=r.text.replace(/^\s*[#*\s]*\d*\.?\s*kesimpulan\s*[:.]?\s*[#*]*\s*\n+/i,'').trim();
+    $('rKes').dispatchEvent(new Event('input'));
+    $('aiInfo').textContent='ℹ️ Dihasilkan oleh '+r.provider+' ('+r.model+')'+(r.ms?' dalam '+(r.ms/1000).toFixed(1)+' detik':'')+'. Silakan periksa dan edit bila perlu.';
+  }catch(e){alert('Gagal generate kesimpulan lewat Worker.\n\n'+e.message+'\n\nAnda tetap bisa menulis kesimpulan secara manual.');}
+  finally{aiBusy=false;b.disabled=false;b.textContent='✨ Generate Kesimpulan (AI)';}
+};
+
+/* ---------- Word ---------- */
+async function saveBlob(blob,name){
+  try{const dl=window.claude&&await window.claude.use('downloads');if(dl){await dl.save({filename:name,data:await blob.arrayBuffer()});return;}}catch(e){if(e&&e.code==='declined')return;}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
+}
+$('docBtn').onclick=async()=>{
+  if(typeof docx==='undefined'){alert('Library Word (docx) gagal dimuat. Cek koneksi internet lalu muat ulang halaman.');return;}
+  const {Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,WidthType,AlignmentType,ShadingType}=docx;
+  const F='Arial';
+  const P=(t,o={})=>new Paragraph({alignment:o.al,spacing:{before:o.before||0,after:o.after??120},keepNext:!!o.kn,
+    children:[new TextRun({text:String(t),bold:!!o.b,size:o.sz||22,font:F})]});
+  const C=(t,w,o={})=>new TableCell({width:{size:w,type:WidthType.DXA},margins:{top:50,bottom:50,left:80,right:80},
+    shading:o.hd?{fill:'D9E2F3',type:ShadingType.CLEAR,color:'auto'}:undefined,
+    children:[new Paragraph({alignment:o.al,children:[new TextRun({text:String(t??''),bold:!!o.hd,size:18,font:F})]})]});
+  const TB=(cols,head,body,al)=>new Table({width:{size:cols.reduce((a,b)=>a+b,0),type:WidthType.DXA},columnWidths:cols,
+    rows:[new TableRow({tableHeader:true,children:head.map((h,i)=>C(h,cols[i],{hd:1,al:AlignmentType.CENTER}))}),
+      ...body.map(r=>new TableRow({cantSplit:true,children:r.map((v,i)=>C(v,cols[i],{al:al&&al[i]}))}))]});
+  const ch=[];
+  ch.push(P('LAPORAN VERIFIKASI ASSET OPNAME',{b:1,sz:28,al:AlignmentType.CENTER,after:240}));
+  [['Periode / Tanggal',periodeText()]]
+   .forEach(([k,v])=>ch.push(new Paragraph({spacing:{after:60},children:[new TextRun({text:k+'\t: ',size:22,font:F}),new TextRun({text:v,size:22,font:F})],tabStops:[{type:'left',position:2400}]})));
+  // A. ringkasan
+  const S=statsRuang(),sum=S.reduce((a,x)=>({n:a.n+x.n,ok:a.ok+x.ok,rusak:a.rusak+x.rusak,hilang:a.hilang+x.hilang,belum:a.belum+x.belum}),{n:0,ok:0,rusak:0,hilang:0,belum:0});
+  ch.push(P('A. Ringkasan per Ruang',{b:1,before:240,kn:1}));
+  const R=AlignmentType.CENTER;
+  ch.push(TB([3138,1100,1300,1100,1700,1300],['Ruang','Total','Ada & baik','Rusak','Tidak ditemukan','Belum'],
+    [...S.map(c=>[c.name,c.n,c.ok,c.rusak,c.hilang,c.belum]),['TOTAL',sum.n,sum.ok,sum.rusak,sum.hilang,sum.belum]],[null,R,R,R,R,R]));
+  // C. kesimpulan
+  ch.push(P('B. Kesimpulan Keseluruhan',{b:1,before:280,kn:1}));
+  const kes=$('rKes').value.trim();
+  if(!kes)ch.push(P('(Kesimpulan belum diisi)'));
+  else kes.split(/\n+/).map(l=>l.trim()).filter(Boolean).forEach(l=>{
+    if(/^[-•*]\s+/.test(l))ch.push(new Paragraph({bullet:{level:0},alignment:AlignmentType.JUSTIFIED,spacing:{after:80},children:[new TextRun({text:l.replace(/^[-•*]\s+/,''),size:22,font:F})]}));
+    else ch.push(new Paragraph({alignment:AlignmentType.JUSTIFIED,spacing:{after:140},children:[new TextRun({text:l,size:22,font:F})]}));});
+  const doc=new Document({sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1134,bottom:1134,left:1134,right:1134}}},children:ch}]});
+  try{const blob=await Packer.toBlob(doc);await saveBlob(blob,'Laporan_Asset_Opname_'+new Date().toISOString().slice(0,10)+'.docx');}
+  catch(e){alert('Gagal membuat file Word: '+e.message);}
+};
+showResume();
+</script>
+</body>
+</html>
