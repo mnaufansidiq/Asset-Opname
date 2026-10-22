@@ -80,8 +80,9 @@ details.card summary{cursor:pointer;font-weight:600}
     <div><label>Tanggal Opname</label><input type="date" id="rTgl1" style="width:100%"></div>
   </div>
   <div style="margin:4px 0 12px"><label>Keterangan tambahan keseluruhan (opsional, bisa pakai poin / nomor urut; tidak dicetak sendiri di Word, hanya diuraikan AI ke dalam kesimpulan)</label>
-    <div class="rtb"><button type="button" data-cmd="insertUnorderedList" title="Daftar poin">• Poin</button><button type="button" data-cmd="insertOrderedList" title="Daftar bernomor">1. Nomor</button><button type="button" data-cmd="indent" title="Geser ke dalam (Tab)">→ Menjorok</button><button type="button" data-cmd="outdent" title="Geser ke luar (Shift+Tab)">← Keluar</button></div>
-    <div id="rNote" class="rte" contenteditable="true" data-ph="mis. 1. Sebagian AC di Ruang Rapat sedang diperbaiki&#10;2. Genset di Gudang sudah dipindahkan ke unit lain"></div></div>
+    <div class="rtb"><button type="button" data-cmd="insertUnorderedList" title="Daftar poin">• Poin</button><button type="button" data-cmd="insertOrderedList" title="Daftar bernomor">1. Nomor</button><button type="button" data-cmd="indent" title="Geser ke dalam (Tab)">→ Menjorok</button><button type="button" data-cmd="outdent" title="Geser ke luar (Shift+Tab)">← Keluar</button><button type="button" id="noteSave" class="p" style="margin-left:auto" title="Simpan keterangan">💾 Simpan</button></div>
+    <div id="rNote" class="rte" contenteditable="true" data-ph="mis. 1. Sebagian AC di Ruang Rapat sedang diperbaiki&#10;2. Genset di Gudang sudah dipindahkan ke unit lain"></div>
+    <div class="mu" id="noteInfo" style="margin-top:4px">Tersimpan otomatis saat Anda mengetik.</div></div>
   <div class="row">
     <select id="rLvl"><option value="ringkas">Kesimpulan ringkas</option><option value="standar" selected>Kesimpulan standar</option><option value="detail">Kesimpulan detail</option></select>
     <button id="aiBtn" class="p">✨ Generate Kesimpulan (AI)</button>
@@ -284,8 +285,13 @@ function textToRte(t){
   }
   close();return html;
 }
-document.querySelectorAll('.rtb button').forEach(b=>{b.addEventListener('mousedown',e=>e.preventDefault());
+document.querySelectorAll('.rtb button[data-cmd]').forEach(b=>{b.addEventListener('mousedown',e=>e.preventDefault());
   b.addEventListener('click',()=>{$('rNote').focus();document.execCommand(b.dataset.cmd);saveRep();});});
+$('noteSave').addEventListener('mousedown',e=>e.preventDefault());
+$('noteSave').addEventListener('click',()=>{saveRep();const ok=LS.get(RK)!==null&&(()=>{try{return JSON.parse(LS.get(RK)).rNote===rteText($('rNote'));}catch(e){return false;}})();
+  const b=$('noteSave'),t=new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  $('noteInfo').textContent=ok?'✓ Keterangan tersimpan pukul '+t:'⚠ Gagal menyimpan: penyimpanan browser diblokir. Teks tetap aman selama halaman terbuka.';
+  b.textContent=ok?'✓ Tersimpan':'⚠ Gagal';setTimeout(()=>b.textContent='💾 Simpan',2500);});
 $('rNote').addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();document.execCommand(e.shiftKey?'outdent':'indent');}});
 $('rNote').addEventListener('paste',e=>{e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain')||'');});
 const fmtD=v=>{if(!v)return'';const [y,m,d]=v.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});};
