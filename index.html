@@ -75,6 +75,8 @@ details.card summary{cursor:pointer;font-weight:600}
   <div class="grid2">
     <div><label>Tanggal Opname</label><input type="date" id="rTgl1" style="width:100%"></div>
   </div>
+  <div style="margin:4px 0 12px"><label>Keterangan tambahan keseluruhan (opsional, tidak dicetak sendiri di Word, hanya diuraikan AI ke dalam kesimpulan)</label>
+    <textarea id="rNote" rows="3" placeholder="mis. Sebagian AC di Ruang Rapat sedang dalam perbaikan; Genset di Gudang dipindahkan ke unit lain bulan lalu…"></textarea></div>
   <div class="row">
     <select id="rLvl"><option value="ringkas">Kesimpulan ringkas</option><option value="standar" selected>Kesimpulan standar</option><option value="detail">Kesimpulan detail</option></select>
     <button id="aiBtn" class="p">✨ Generate Kesimpulan (AI)</button>
@@ -235,7 +237,7 @@ $('exp1').onclick=goReport;$('exp2').onclick=goReport;
 const WORKER_URL='https://so-proxy.mnaufansidiq.workers.dev/';
 const RK='opname2:rep';
 const cv=(s,r,k)=>s.m[k]>=0?r[s.m[k]]:'';
-const RF=['rTgl1','rKes'];
+const RF=['rTgl1','rNote','rKes'];
 (function(){try{const d=JSON.parse(LS.get(RK)||'{}');RF.forEach(i=>{if(d[i])$(i).value=d[i];});}catch(e){}
   if(!$('rTgl1').value)$('rTgl1').value=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);})();
 RF.forEach(i=>$(i).addEventListener('input',()=>{const d={};RF.forEach(x=>d[x]=$(x).value);LS.set(RK,JSON.stringify(d));}));
@@ -260,6 +262,8 @@ function buildPrompt(){
   if(!T.length)d+='(tidak ada temuan)\n';
   T.slice(0,60).forEach(t=>{d+='- ['+t.status+'] '+t.ruang+' — '+t.nama+(t.kode?' ('+t.kode+')':'')+(t.jml!==''?', jumlah '+t.jml:'')+(t.cat?'. Catatan: '+t.cat:'')+'\n';});
   if(T.length>60)d+='(dan '+(T.length-60)+' temuan lainnya)\n';
+  const note=$('rNote').value.trim();
+  if(note)d+='\nKETERANGAN TAMBAHAN DARI PETUGAS:\n'+note+'\n';
   const lv=$('rLvl').value;
   const gaya=lv==='ringkas'?'RINGKAS — tiap poin 1 kalimat pendek dan langsung ke inti.':lv==='detail'?'DETAIL — tiap poin boleh 1-2 kalimat yang menjelaskan konteks dan implikasinya, tetap hanya berdasar data.':'STANDAR — tiap poin berupa kalimat lengkap dan deskriptif dengan konteks secukupnya.';
   return 'Anda adalah asisten penyusun laporan pengawasan internal berbahasa Indonesia yang formal. '
@@ -268,6 +272,7 @@ function buildPrompt(){
    +'1) Satu paragraf pembuka 3-4 kalimat yang merangkum garis besar hasil: periode, cakupan ruang dan jumlah aset, kondisi umum, serta angka temuan. WAJIB sebut hal spesifik dari data (nama ruang, angka). DILARANG kalimat template kosong.\n'
    +'2) Beri SATU baris kosong, lalu tulis poin-poin (tiap poin diawali "- "): ruang yang menonjol, aset rusak / tidak ditemukan yang penting (sebut nama aset dan ruangnya), serta arahan tindak lanjut. Gaya poin: '+gaya+' Jika ada aset belum diverifikasi, sebut sebagai catatan. Jumlah poin secukupnya sesuai data.\n'
    +'3) Paragraf pembuka DAN poin-poin harus sama-sama ada, dan jawaban harus selesai utuh, tidak terpotong.\n'
+   +(note?'4) Terdapat KETERANGAN TAMBAHAN dari petugas di bagian data. Uraikan dan kembangkan (elaborasi) keterangan itu secara formal, lalu padukan ke dalam paragraf pembuka dan/atau poin-poin kesimpulan. Jangan disalin mentah-mentah dan jangan menambah fakta di luar yang ditulis petugas.\n':'')
    +'Gunakan gaya laporan resmi. JANGAN pakai markdown (tanpa **, heading, atau penomoran), hanya paragraf biasa dan baris "- ". Jangan mengarang data yang tidak ada di bawah ini.\n\n'+d;
 }
 async function callAI(prompt,timeoutMs=35000){
