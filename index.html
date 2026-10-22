@@ -42,6 +42,12 @@ td input[type=text]{width:100%;min-width:130px;padding:5px 8px}
 label{display:block;font-size:12px;color:var(--mu);margin-bottom:3px}
 .chk{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--tx);margin:6px 0 12px}
 textarea{width:100%;font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:9px 10px;margin:10px 0 4px;resize:vertical}
+.fotos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px}
+.foto{background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:6px;position:relative}
+.foto img{width:100%;height:110px;object-fit:cover;border-radius:6px;display:block}
+.foto input{width:100%;margin-top:6px;padding:5px 8px;font-size:13px}
+.foto .x{position:absolute;top:10px;right:10px;padding:1px 8px;border-radius:99px;background:var(--card);font-weight:700}
+.foto .no{position:absolute;top:10px;left:10px;padding:0 8px;border-radius:99px;background:var(--pr);color:var(--prt);font-size:12px;font-weight:700}
 details.card summary{cursor:pointer;font-weight:600}
 .hide{display:none}.mu{color:var(--mu);font-size:13px}
 </style>
@@ -75,6 +81,10 @@ details.card summary{cursor:pointer;font-weight:600}
   </div>
   <textarea id="rKes" rows="9" placeholder="Kesimpulan dari AI muncul di sini dan bisa Anda edit sebelum diunduh. Boleh juga ditulis manual."></textarea>
   <p class="mu" id="aiInfo" style="margin:0 0 12px"></p>
+  <div style="margin:4px 0 14px"><label>Lampiran Foto (bisa pilih lebih dari satu)</label>
+    <input type="file" id="fotoIn" accept="image/*" multiple>
+    <div class="mu" id="fotoInfo" style="margin-top:4px"></div>
+    <div class="fotos" id="fotoList"></div></div>
   <button id="docBtn" class="p">📄 Unduh Laporan Word (.docx)</button>
 </details>
 <div class="tools"><input type="text" id="rq" placeholder="Cari ruang…"></div>
@@ -299,7 +309,7 @@ async function saveBlob(blob,name){
 }
 $('docBtn').onclick=async()=>{
   if(typeof docx==='undefined'){alert('Library Word (docx) gagal dimuat. Cek koneksi internet lalu muat ulang halaman.');return;}
-  const {Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,WidthType,AlignmentType,ShadingType}=docx;
+  const {Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,WidthType,AlignmentType,ShadingType,ImageRun}=docx;
   const F='Arial';
   const P=(t,o={})=>new Paragraph({alignment:o.al,spacing:{before:o.before||0,after:o.after??120},keepNext:!!o.kn,
     children:[new TextRun({text:String(t),bold:!!o.b,size:o.sz||22,font:F})]});
@@ -326,10 +336,36 @@ $('docBtn').onclick=async()=>{
   else kes.split(/\n+/).map(l=>l.trim()).filter(Boolean).forEach(l=>{
     if(/^[-•*]\s+/.test(l))ch.push(new Paragraph({bullet:{level:0},alignment:AlignmentType.JUSTIFIED,spacing:{after:80},children:[new TextRun({text:l.replace(/^[-•*]\s+/,''),size:22,font:F})]}));
     else ch.push(new Paragraph({alignment:AlignmentType.JUSTIFIED,spacing:{after:140},children:[new TextRun({text:l,size:22,font:F})]}));});
+  if(FOTO.length){
+    ch.push(P('C. Lampiran Foto',{b:1,before:280,kn:1}));
+    FOTO.forEach((f,i)=>{const k=Math.min(1,560/f.w,380/f.h),w=Math.round(f.w*k),h=Math.round(f.h*k);
+      ch.push(new Paragraph({alignment:AlignmentType.CENTER,keepNext:true,spacing:{before:160,after:60},children:[new ImageRun({type:'jpg',data:dataUrlToBuf(f.dataUrl),transformation:{width:w,height:h}})]}));
+      ch.push(new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:200},children:[new TextRun({text:'Foto '+(i+1)+'.',bold:true,size:20,font:F}),new TextRun({text:f.cap.trim()?' '+f.cap.trim():'',size:20,font:F})]}));});
+  }
   const doc=new Document({sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1134,bottom:1134,left:1134,right:1134}}},children:ch}]});
   try{const blob=await Packer.toBlob(doc);await saveBlob(blob,'Laporan_Asset_Opname_'+new Date().toISOString().slice(0,10)+'.docx');}
   catch(e){alert('Gagal membuat file Word: '+e.message);}
 };
+
+/* ---------- Lampiran foto ---------- */
+let FOTO=[];
+const dataUrlToBuf=u=>{const b=atob(u.split(',')[1]),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;};
+function compressImg(file,max=1200,q=0.8){return new Promise((res,rej)=>{const r=new FileReader();r.onerror=rej;
+  r.onload=e=>{const im=new Image();im.onerror=rej;im.onload=()=>{let w=im.width,h=im.height;const k=Math.min(1,max/Math.max(w,h));
+    w=Math.round(w*k);h=Math.round(h*k);const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');
+    x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);res({dataUrl:c.toDataURL('image/jpeg',q),w,h});};im.src=e.target.result;};
+  r.readAsDataURL(file);});}
+function renderFoto(){
+  $('fotoList').innerHTML=FOTO.map((f,i)=>`<div class="foto"><span class="no">${i+1}</span><button class="x" data-d="${i}" title="Hapus">×</button><img src="${f.dataUrl}" alt="Foto ${i+1}"><input type="text" data-c="${i}" placeholder="Keterangan foto…" value="${esc(f.cap)}"></div>`).join('');
+  $('fotoInfo').textContent=FOTO.length?FOTO.length+' foto terlampir (hanya tersimpan selama halaman ini terbuka).':'';
+}
+$('fotoIn').onchange=async e=>{const fs=[...e.target.files];let fail=0;
+  $('fotoInfo').textContent='⏳ Memproses '+fs.length+' foto…';
+  for(const f of fs){try{const r=await compressImg(f);FOTO.push({...r,cap:''});}catch(err){fail++;}}
+  e.target.value='';renderFoto();
+  if(fail)alert(fail+' file gagal dibaca (bukan gambar yang valid).');};
+$('fotoList').onclick=e=>{const b=e.target.closest('[data-d]');if(!b)return;FOTO.splice(+b.dataset.d,1);renderFoto();};
+$('fotoList').oninput=e=>{const i=e.target.dataset.c;if(i!==undefined)FOTO[+i].cap=e.target.value;};
 showResume();
 </script>
 </body>
