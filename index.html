@@ -99,6 +99,8 @@ details.card summary{cursor:pointer;font-weight:600}
     <input type="file" id="fotoIn" accept="image/*" multiple>
     <div class="mu" id="fotoInfo" style="margin-top:4px"></div>
     <div class="fotos" id="fotoList"></div></div>
+  <div style="margin:0 0 10px"><label>Lampiran rincian aset per ruang</label>
+    <select id="lampMode"><option value="all" selected>Semua aset (lengkap per ruang)</option><option value="temuan">Hanya temuan (rusak / tidak ditemukan)</option><option value="none">Tanpa lampiran rincian</option></select></div>
   <button id="docBtn" class="p">📄 Unduh Laporan Word (.docx)</button>
 </details>
 <div class="tools"><input type="text" id="rq" placeholder="Cari ruang…"></div>
@@ -394,14 +396,19 @@ $('docBtn').onclick=async()=>{
   if(typeof docx==='undefined'){alert('Library Word (docx) gagal dimuat. Cek koneksi internet lalu muat ulang halaman.');return;}
   const {Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,WidthType,AlignmentType,ShadingType,ImageRun}=docx;
   const F='Arial';
-  const P=(t,o={})=>new Paragraph({alignment:o.al,spacing:{before:o.before||0,after:o.after??120},keepNext:!!o.kn,
+  const P=(t,o={})=>new Paragraph({alignment:o.al,spacing:{before:o.before||0,after:o.after??120},keepNext:!!o.kn,pageBreakBefore:!!o.pb,
     children:[new TextRun({text:String(t),bold:!!o.b,size:o.sz||22,font:F})]});
   const C=(t,w,o={})=>new TableCell({width:{size:w,type:WidthType.DXA},margins:{top:50,bottom:50,left:80,right:80},
-    shading:o.hd?{fill:'D9E2F3',type:ShadingType.CLEAR,color:'auto'}:undefined,
-    children:[new Paragraph({alignment:o.al,children:[new TextRun({text:String(t??''),bold:!!o.hd,size:18,font:F})]})]});
+    shading:(o.hd||o.fill)?{fill:o.hd?'D9E2F3':o.fill,type:ShadingType.CLEAR,color:'auto'}:undefined,
+    children:[new Paragraph({alignment:o.al,children:[new TextRun({text:String(t??''),bold:!!o.hd,size:o.sz||18,font:F})]})]});
   const TB=(cols,head,body,al)=>new Table({width:{size:cols.reduce((a,b)=>a+b,0),type:WidthType.DXA},columnWidths:cols,
     rows:[new TableRow({tableHeader:true,children:head.map((h,i)=>C(h,cols[i],{hd:1,al:AlignmentType.CENTER}))}),
       ...body.map(r=>new TableRow({cantSplit:true,children:r.map((v,i)=>C(v,cols[i],{al:al&&al[i]}))}))]});
+  const TD=(cols,head,rows)=>{const AL=[AlignmentType.CENTER,undefined,undefined,AlignmentType.CENTER,undefined,undefined,undefined];
+    return new Table({width:{size:cols.reduce((a,b)=>a+b,0),type:WidthType.DXA},columnWidths:cols,
+      rows:[new TableRow({tableHeader:true,children:head.map((h,i)=>C(h,cols[i],{hd:1,sz:16,al:AlignmentType.CENTER}))}),
+        ...rows.map(r=>new TableRow({cantSplit:true,children:r.v.map((v,i)=>C(v,cols[i],{sz:16,al:AL[i],fill:i===5?r.fill:undefined}))}))]});};
+  const lamp=$('lampMode').value;
   const ch=[];
   ch.push(P('LAPORAN VERIFIKASI ASSET OPNAME',{b:1,sz:28,al:AlignmentType.CENTER,after:240}));
   [['Periode / Tanggal',periodeText()]]
@@ -419,8 +426,22 @@ $('docBtn').onclick=async()=>{
   else kes.split(/\n+/).map(l=>l.trim()).filter(Boolean).forEach(l=>{
     if(/^[-•*]\s+/.test(l))ch.push(new Paragraph({bullet:{level:0},alignment:AlignmentType.JUSTIFIED,spacing:{after:80},children:[new TextRun({text:l.replace(/^[-•*]\s+/,''),size:22,font:F})]}));
     else ch.push(new Paragraph({alignment:AlignmentType.JUSTIFIED,spacing:{after:140},children:[new TextRun({text:l,size:22,font:F})]}));});
+  if(lamp!=='none'){
+    ch.push(new Paragraph({pageBreakBefore:true,keepNext:true,spacing:{after:120},children:[new TextRun({text:'Lampiran 1. Rincian Aset per Ruang',bold:true,size:24,font:F})]}));
+    const FL={rusak:'FEF3C7',hilang:'FEE2E2'};let any=false;
+    SH.forEach((s,si)=>{
+      const rows=[];
+      s.rows.forEach((r,i)=>{const x=st[K(si,i)]||'';
+        if(lamp==='temuan'&&x!=='rusak'&&x!=='hilang')return;
+        rows.push({fill:FL[x],v:[rows.length+1,cv(s,r,'kode'),cv(s,r,'nama'),s.m.jml>=0?cv(s,r,'jml'):'-',s.m.tgl>=0?fmtDate(cv(s,r,'tgl')):'-',LBL[x]||'Belum dicek',nt[K(si,i)]||'']});});
+      if(!rows.length)return;any=true;
+      ch.push(new Paragraph({keepNext:true,spacing:{before:240,after:80},children:[new TextRun({text:s.name+' ('+(lamp==='temuan'?rows.length+' temuan dari '+s.rows.length+' aset':rows.length+' aset')+')',bold:true,size:20,font:F})]}));
+      ch.push(TD([500,1500,2800,700,1300,1300,1538],['No','No. Asset','Nama Asset','Jml','Tgl Perolehan','Status','Catatan'],rows));
+    });
+    if(!any)ch.push(P('(Tidak ada aset rusak atau tidak ditemukan.)'));
+  }
   if(FOTO.length){
-    ch.push(P('C. Lampiran Foto',{b:1,before:280,kn:1}));
+    ch.push(P((lamp!=='none'?'Lampiran 2. Foto':'Lampiran 1. Foto'),{b:1,before:280,kn:1,pb:lamp!=='none'}));
     FOTO.forEach((f,i)=>{const k=Math.min(1,560/f.w,380/f.h),w=Math.round(f.w*k),h=Math.round(f.h*k);
       ch.push(new Paragraph({alignment:AlignmentType.CENTER,keepNext:true,spacing:{before:160,after:60},children:[new ImageRun({type:'jpg',data:dataUrlToBuf(f.dataUrl),transformation:{width:w,height:h}})]}));
       ch.push(new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:200},children:[new TextRun({text:'Foto '+(i+1)+'.',bold:true,size:20,font:F}),new TextRun({text:f.cap.trim()?' '+f.cap.trim():'',size:20,font:F})]}));});
