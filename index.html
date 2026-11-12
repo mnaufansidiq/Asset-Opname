@@ -63,6 +63,11 @@ details.card summary{cursor:pointer;font-weight:600}
   <h1>Checklist Verifikasi Asset Opname</h1>
   <p class="sub">Upload Excel aset. Setiap sheet dianggap satu ruang, kolom dibaca otomatis. Anda tinggal memilih ruangnya.</p>
   <div class="card">
+    <div class="grid2">
+      <div><label>Nama Anda (untuk mode tim)</label><input type="text" id="myName" style="width:100%" placeholder="mis. Naufan"></div>
+      <div><label>Kode Tim (kosongkan jika kerja sendiri)</label><input type="text" id="teamCode" style="width:100%" placeholder="6-40 huruf/angka, tanpa spasi"></div>
+    </div>
+    <div class="row" style="margin-bottom:12px"><button id="joinBtn" class="p">👥 Gabung Sesi Tim</button><span class="mu">Orang pertama upload Excel dengan kode tim, orang kedua klik Gabung.</span></div>
     <div class="row"><input type="file" id="file" accept=".xlsx,.xls,.csv"><button id="demo">Pakai data contoh</button></div>
     <div id="resumeBox" class="hide" style="margin-top:12px"><button id="resume" class="p"></button></div>
   </div>
@@ -71,8 +76,9 @@ details.card summary{cursor:pointer;font-weight:600}
 <div id="rooms" class="hide">
   <div class="card">
     <div class="row sb"><h2>Pilih Ruang</h2>
-      <div class="row"><button id="exp1" class="p">📄 Export Word</button><button id="reset">Reset</button></div></div>
+      <div class="row"><button id="teamBtn" class="p">👥 Jadikan Sesi Tim</button><button id="exp1" class="p">📄 Export Word</button><button id="reset">🗑 Reset &amp; Upload Baru</button></div></div>
     <p class="mu" id="ptxt1" style="margin:8px 0 6px"></p>
+    <p class="mu" id="syncInfo" style="margin:0 0 6px"></p>
     <div class="bar"><i id="pbar1" style="width:0"></i></div>
   </div>
   <details class="card" id="rep"><summary>📄 Export Word &amp; Kesimpulan AI</summary>
@@ -145,7 +151,7 @@ function openWb(wb,name){
     if(rows.length)SH.push({name:n,hdr:d.h,m:d.m,rows});});
   if(!SH.length){alert('Tidak ada data di file ini.');return;}
   fname=name;cfg={key:'opname2:'+name+':'+SH.map(s=>s.name+s.rows.length).join('|')};
-  loadProg();sessSave();goRooms();
+  loadProg();sessSave();goRooms();hostSession();
 }
 $('file').onchange=async e=>{const f=e.target.files[0];if(!f)return;openWb(XLSX.read(await f.arrayBuffer(),{type:'array'}),f.name);};
 $('demo').onclick=()=>{
@@ -163,8 +169,9 @@ const save=()=>LS.set(cfg.key,JSON.stringify({st,nt,ts}));
 const sessSave=()=>LS.set('opname2:last',JSON.stringify({cfg,SH,fname}));
 function showResume(){try{const s=JSON.parse(LS.get('opname2:last')||'null');if(!s||!s.SH)return;
   const d=Object.keys(JSON.parse(LS.get(s.cfg.key)||'{"st":{}}').st||{}).length,t=s.SH.reduce((a,x)=>a+x.rows.length,0);
-  $('resume').textContent='▶ Lanjutkan: '+s.fname+' ('+d+'/'+t+' sudah dicek)';$('resumeBox').classList.remove('hide');}catch(e){}}
-$('resume').onclick=()=>{try{const s=JSON.parse(LS.get('opname2:last'));cfg=s.cfg;SH=s.SH;fname=s.fname;loadProg();goRooms();}catch(e){}};
+  $('resume').textContent='▶ Lanjutkan: '+s.fname+(s.cfg&&s.cfg.team?' [tim]':'')+' ('+d+'/'+t+' sudah dicek)';$('resumeBox').classList.remove('hide');}catch(e){}}
+$('resume').onclick=()=>{try{const s=JSON.parse(LS.get('opname2:last'));cfg=s.cfg;SH=s.SH;fname=s.fname;loadProg();goRooms();
+  if(cfg.team){CODE=cfg.team;ME=$('myName').value.trim()||ME;startSync();}}catch(e){}};
 
 /* ---------- pilih ruang (= sheet) ---------- */
 function goRooms(){cur=-1;show('rooms');renderRooms();}
@@ -195,7 +202,7 @@ function renderRoom(){
     if(g){const a2=all.filter(i=>gk(S.rows[i])===g);h+=`<tr class="gh"><td colspan="7">${esc(g)}<small>${a2.filter(i=>st[K(cur,i)]).length}/${a2.length} dicek</small></td></tr>`;}
     G[g].forEach(i=>{const r=S.rows[i],s=st[K(cur,i)]||'';n++;
       h+=`<tr class="${s?'s-'+s:''}"><td>${n}</td><td>${esc(c(r,'kode'))}</td><td><strong>${esc(c(r,'nama'))}</strong></td><td>${m.jml>=0?esc(c(r,'jml')):'-'}</td><td>${m.tgl>=0?esc(fmtDate(c(r,'tgl'))):'-'}</td>
-      <td><div class="acts">${['ok','rusak','hilang'].map(x=>`<button class="${x} ${s===x?'on':''}" data-i="${i}" data-s="${x}">${x==='ok'?'✓ ':x==='rusak'?'⚠ ':'✗ '}${LBL[x]}</button>`).join('')}</div></td>
+      <td><div class="acts">${['ok','rusak','hilang'].map(x=>`<button class="${x} ${s===x?'on':''}" data-i="${i}" data-s="${x}">${x==='ok'?'✓ ':x==='rusak'?'⚠ ':'✗ '}${LBL[x]}</button>`).join('')}</div>${by[K(cur,i)]?`<small class="mu">oleh ${esc(by[K(cur,i)])}</small>`:''}</td>
       <td><input type="text" data-n="${i}" placeholder="Catatan…" value="${esc(nt[K(cur,i)]||'')}"></td></tr>`;});});
   $('tbl').innerHTML=n?h+'</tbody></table></div>':'<div class="card">Tidak ada aset yang cocok.</div>';
   const cn={ok:0,rusak:0,hilang:0};all.forEach(i=>{const s=st[K(cur,i)];if(s)cn[s]++;});const d=cn.ok+cn.rusak+cn.hilang;
@@ -205,22 +212,40 @@ function renderRoom(){
 }
 $('tbl').onclick=e=>{const b=e.target.closest('button[data-i]');if(!b)return;const k=K(cur,b.dataset.i),s=b.dataset.s;
   if(st[k]===s){delete st[k];delete ts[k];}else{st[k]=s;ts[k]=new Date().toLocaleString('id-ID');}
-  save();renderRoom();};
-$('tbl').oninput=e=>{const i=e.target.dataset.n;if(i===undefined)return;nt[K(cur,i)]=e.target.value;save();};
+  save();by[k]=ME;pushMark(k);renderRoom();};
+$('tbl').oninput=e=>{const i=e.target.dataset.n;if(i===undefined)return;const k=K(cur,i);nt[k]=e.target.value;save();by[k]=ME;pushMark(k);};
 $('q').oninput=renderRoom;$('f').onchange=renderRoom;
 $('back').onclick=()=>{save();goRooms();};
 $('savebtn').onclick=()=>{const b=$('savebtn');save();sessSave();
   b.textContent='✓ Tersimpan '+new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
   setTimeout(()=>b.textContent='💾 Simpan',2500);};
 
-/* ---------- reset (2x klik) ---------- */
+/* ---------- reset data (2x klik) ---------- */
+const RESET_LBL='🗑 Reset & Upload Baru';
+function resetReport(){
+  LS.del(RK);$('rKes').value='';$('rNote').innerHTML='';
+  $('rTgl1').value=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  $('rLvl').value='standar';$('aiInfo').textContent='';
+  $('noteInfo').textContent='Tersimpan otomatis saat Anda mengetik.';
+  FOTO=[];renderFoto();$('fotoIn').value='';$('rep').open=false;
+}
 let rt=null;
 $('reset').onclick=()=>{const b=$('reset');
-  if(!rt){b.textContent='Yakin? Klik lagi untuk hapus';b.style.borderColor='var(--er)';b.style.color='var(--er)';
-    rt=setTimeout(()=>{rt=null;b.textContent='Reset';b.style.borderColor='';b.style.color='';},4000);return;}
-  clearTimeout(rt);rt=null;b.textContent='Reset';b.style.borderColor='';b.style.color='';
-  LS.del(cfg.key);LS.del('opname2:last');st={};nt={};ts={};SH=[];
-  $('file').value='';$('resumeBox').classList.add('hide');show('setup');};
+  if(!rt){
+    b.textContent='Yakin? Data di perangkat ini dihapus. Klik lagi';
+    b.style.borderColor='var(--er)';b.style.color='var(--er)';
+    rt=setTimeout(()=>{rt=null;b.textContent=RESET_LBL;b.style.borderColor='';b.style.color='';},4000);
+    return;}
+  clearTimeout(rt);rt=null;
+  b.textContent=RESET_LBL;b.style.borderColor='';b.style.color='';
+  clearInterval(pollT);CODE='';by={};setSync('');
+  LS.del(cfg.key);LS.del('opname2:last');
+  st={};nt={};ts={};SH=[];cfg={};fname='';cur=-1;
+  resetReport();
+  $('file').value='';$('rq').value='';$('q').value='';$('f').value='';$('teamCode').value='';
+  $('resumeBox').classList.add('hide');
+  show('setup');
+};
 
 /* ---------- export: satu sheet per ruang ---------- */
 async function exportXlsx(){
@@ -251,7 +276,7 @@ RF.forEach(i=>$(i).addEventListener('input',saveRep));$('rNote').addEventListene
 /* editor poin / nomor */
 function rteText(root){
   const out=[];let buf='';
-  const flush=d=>{const t=buf.replace(/ /g,' ').trim();if(t)out.push('  '.repeat(d)+t);buf='';};
+  const flush=d=>{const t=buf.replace(/\u00a0/g,' ').trim();if(t)out.push('  '.repeat(d)+t);buf='';};
   const walk=(el,d)=>{
     for(const c of el.childNodes){
       if(c.nodeType===3){buf+=c.textContent;continue;}
@@ -261,7 +286,7 @@ function rteText(root){
       if(tg==='UL'||tg==='OL'){flush(d);let n=0;
         for(const li of c.children){if(li.tagName!=='LI')continue;n++;let own='';const subs=[];
           li.childNodes.forEach(k=>{if(k.nodeType===1&&/^(UL|OL)$/.test(k.tagName))subs.push(k);else own+=k.textContent;});
-          out.push('  '.repeat(d)+(tg==='OL'?n+'. ':'- ')+own.replace(/ /g,' ').trim());
+          out.push('  '.repeat(d)+(tg==='OL'?n+'. ':'- ')+own.replace(/\u00a0/g,' ').trim());
           subs.forEach(sl=>{const tmp=document.createElement('div');tmp.appendChild(sl.cloneNode(true));walk(tmp,d+1);});}
         continue;}
       if(/^(DIV|P)$/.test(tg)){flush(d);if(c.querySelector('ul,ol'))walk(c,d);else{buf=c.textContent;flush(d);}continue;}
@@ -424,6 +449,91 @@ $('fotoIn').onchange=async e=>{const fs=[...e.target.files];let fail=0;
   if(fail)alert(fail+' file gagal dibaca (bukan gambar yang valid).');};
 $('fotoList').onclick=e=>{const b=e.target.closest('[data-d]');if(!b)return;FOTO.splice(+b.dataset.d,1);renderFoto();};
 $('fotoList').oninput=e=>{const i=e.target.dataset.c;if(i!==undefined)FOTO[+i].cap=e.target.value;};
+
+/* ================= KOLABORASI (Cloudflare D1) ================= */
+const API=WORKER_URL.replace(/\/$/,'');
+let CODE='',ME=LS.get('opname2:me')||'',by={},since=0,pollT=null,pending={},needR=false;
+$('myName').value=ME;
+
+async function api(path,body){
+  const r=await fetch(API+path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:undefined);
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||('Server '+r.status));
+  return d;
+}
+const setSync=(t,c)=>{const e=$('syncInfo');if(e){e.textContent=t;e.style.color=c||'';}};
+
+function readSetup(ask){
+  let n=$('myName').value.trim(),c=$('teamCode').value.trim().replace(/\s+/g,'-');
+  if(ask){
+    if(!n)n=(prompt('Nama Anda:')||'').trim();
+    if(!c)c=(prompt('Kode Tim (6-40 huruf/angka, tanpa spasi):')||'').trim().replace(/\s+/g,'-');}
+  $('myName').value=n;$('teamCode').value=c;ME=n;CODE='';
+  LS.set('opname2:me',n);
+  if(!c)return false;
+  if(!/^[A-Za-z0-9_-]{6,40}$/.test(c)){alert('Kode tim harus 6-40 karakter: huruf, angka, - atau _.');return false;}
+  if(!n){alert('Isi nama Anda dulu.');return false;}
+  CODE=c;return true;
+}
+function pushMark(k,retry){
+  if(!CODE)return;
+  clearTimeout(pending[k]);
+  pending[k]=setTimeout(async()=>{
+    delete pending[k];
+    try{await api('/p/'+CODE+'/mark',{k,s:st[k]||'',n:nt[k]||'',ts:ts[k]||'',who:ME});setSync('✓ Tersinkron · kode: '+CODE);}
+    catch(e){setSync('⚠ Gagal kirim, mencoba lagi…','var(--er)');if(!retry)setTimeout(()=>pushMark(k,1),3000);}
+  },400);
+}
+const typing=()=>{const a=document.activeElement;return a&&a.tagName==='INPUT'&&a.closest('#tbl');};
+async function poll(){
+  if(!CODE||document.hidden)return;
+  try{
+    const d=await api('/p/'+CODE+'/marks?since='+since);let ch=false;
+    d.marks.forEach(x=>{
+      since=Math.max(since,x.u);
+      if(pending[x.k])return;
+      x.s?st[x.k]=x.s:delete st[x.k];
+      x.n?nt[x.k]=x.n:delete nt[x.k];
+      x.ts?ts[x.k]=x.ts:delete ts[x.k];
+      by[x.k]=x.who;ch=true;});
+    if(ch)save();
+    if(ch||needR){if(typing())needR=true;else{needR=false;cur>=0?renderRoom():renderRooms();}}
+    setSync('✓ Tersinkron '+new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'})+' · kode: '+CODE);
+  }catch(e){setSync('⚠ Offline / gagal sinkron','var(--er)');}
+}
+async function startSync(){clearInterval(pollT);since=0;await poll();pollT=setInterval(poll,5000);}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();});
+
+/* upload Excel baru dengan kode tim terisi -> buat sesi tim kosong */
+async function hostSession(){
+  clearInterval(pollT);CODE='';
+  if(!$('teamCode').value.trim())return;
+  if(!readSetup(false))return;
+  try{await api('/p/'+CODE+'/init',{SH,fname,marks:[]});}
+  catch(e){alert('Gagal membuat sesi: '+e.message);CODE='';show('setup');return;}
+  cfg={key:'opname2:team:'+CODE,team:CODE};st={};nt={};ts={};by={};sessSave();startSync();
+}
+/* tombol "Jadikan Sesi Tim": progres yang sudah ada ikut terbawa */
+$('teamBtn').onclick=async()=>{
+  if(CODE){alert('Sesi ini sudah mode tim (kode: '+CODE+').');return;}
+  if(!readSetup(true))return;
+  const marks=[];
+  new Set([...Object.keys(st),...Object.keys(nt)]).forEach(k=>{
+    if(st[k]||nt[k])marks.push({k,s:st[k]||'',n:nt[k]||'',ts:ts[k]||'',who:ME});});
+  try{await api('/p/'+CODE+'/init',{SH,fname,marks});}
+  catch(e){alert('Gagal membuat sesi tim: '+e.message);CODE='';return;}
+  cfg={key:'opname2:team:'+CODE,team:CODE};save();sessSave();
+  marks.forEach(m=>by[m.k]=ME);startSync();renderRooms();
+  alert('Sesi tim dibuat dengan '+marks.length+' aset yang sudah dicek.\n\nBagikan kode ini ke teman Anda:\n'+CODE+'\n\nMereka isi nama + kode yang sama lalu klik "Gabung Sesi Tim".');
+};
+$('joinBtn').onclick=async()=>{
+  if(!$('teamCode').value.trim()){alert('Isi kode tim dulu.');return;}
+  if(!readSetup(false))return;
+  try{const d=await api('/p/'+CODE);SH=d.SH;fname=d.fname;}
+  catch(e){alert('Gagal bergabung: '+e.message);CODE='';return;}
+  cfg={key:'opname2:team:'+CODE,team:CODE};st={};nt={};ts={};by={};sessSave();goRooms();startSync();
+};
+
 showResume();
 </script>
 </body>
