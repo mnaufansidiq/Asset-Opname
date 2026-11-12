@@ -76,7 +76,7 @@ details.card summary{cursor:pointer;font-weight:600}
 <div id="rooms" class="hide">
   <div class="card">
     <div class="row sb"><h2>Pilih Ruang</h2>
-      <div class="row"><button id="teamBtn" class="p">👥 Jadikan Sesi Tim</button><button id="exp1" class="p">📄 Export Word</button><button id="reset">🗑 Reset &amp; Upload Baru</button></div></div>
+      <div class="row"><button id="teamBtn" class="p">👥 Jadikan Sesi Tim</button><button id="leaveBtn" class="hide">🚪 Keluar dari Tim</button><button id="exp1" class="p">📄 Export Word</button><button id="reset">🗑 Reset &amp; Upload Baru</button></div></div>
     <p class="mu" id="ptxt1" style="margin:8px 0 6px"></p>
     <p class="mu" id="syncInfo" style="margin:0 0 6px"></p>
     <div class="bar"><i id="pbar1" style="width:0"></i></div>
@@ -179,6 +179,7 @@ $('resume').onclick=()=>{try{const s=JSON.parse(LS.get('opname2:last'));cfg=s.cf
 function goRooms(){cur=-1;show('rooms');renderRooms();}
 const doneIn=si=>SH[si].rows.filter((r,i)=>st[K(si,i)]).length;
 function renderRooms(){
+  updTeamUI();
   const q=$('rq').value.toLowerCase();let tot=0,d=0;
   $('rlist').innerHTML=SH.map((s,si)=>{const n=s.rows.length,dn=doneIn(si);tot+=n;d+=dn;
     if(q&&!s.name.toLowerCase().includes(q))return'';
@@ -240,7 +241,7 @@ $('reset').onclick=()=>{const b=$('reset');
     return;}
   clearTimeout(rt);rt=null;
   b.textContent=RESET_LBL;b.style.borderColor='';b.style.color='';
-  clearInterval(pollT);CODE='';by={};setSync('');
+  clearInterval(pollT);clearTimeout(repT);repT=null;repRemote=null;CODE='';by={};setSync('');
   LS.del(cfg.key);LS.del('opname2:last');
   st={};nt={};ts={};SH=[];cfg={};fname='';cur=-1;
   resetReport();
@@ -271,7 +272,9 @@ const WORKER_URL='https://so-proxy.mnaufansidiq.workers.dev/';
 const RK='opname2:rep';
 const cv=(s,r,k)=>s.m[k]>=0?r[s.m[k]]:'';
 const RF=['rTgl1','rKes'];
-const saveRep=()=>{const d={};RF.forEach(x=>d[x]=$(x).value);d.rNote=rteText($('rNote'));LS.set(RK,JSON.stringify(d));};
+const repData=()=>({tgl:$('rTgl1').value,kes:$('rKes').value,note:rteText($('rNote'))});
+const saveRepLocal=()=>{const d={};RF.forEach(x=>d[x]=$(x).value);d.rNote=rteText($('rNote'));LS.set(RK,JSON.stringify(d));};
+const saveRep=()=>{saveRepLocal();pushRep();};
 (function(){try{const d=JSON.parse(LS.get(RK)||'{}');RF.forEach(i=>{if(d[i])$(i).value=d[i];});if(d.rNote)$('rNote').innerHTML=textToRte(d.rNote);}catch(e){}
   if(!$('rTgl1').value)$('rTgl1').value=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);})();
 RF.forEach(i=>$(i).addEventListener('input',saveRep));$('rNote').addEventListener('input',saveRep);
@@ -512,18 +515,46 @@ async function poll(){
     const d=await api('/p/'+CODE+'/marks?since='+since);let ch=false;
     d.marks.forEach(x=>{
       since=Math.max(since,x.u);
+      if(x.k==='_rep'){if(!repT)repRemote=x;return;}
       if(pending[x.k])return;
       x.s?st[x.k]=x.s:delete st[x.k];
       x.n?nt[x.k]=x.n:delete nt[x.k];
       x.ts?ts[x.k]=x.ts:delete ts[x.k];
       by[x.k]=x.who;ch=true;});
     if(ch)save();
+    applyRepIfIdle();
     if(ch||needR){if(typing())needR=true;else{needR=false;cur>=0?renderRoom():renderRooms();}}
     setSync('✓ Tersinkron '+new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'})+' · kode: '+CODE);
   }catch(e){setSync('⚠ Offline / gagal sinkron','var(--er)');}
 }
-async function startSync(){clearInterval(pollT);since=0;await poll();pollT=setInterval(poll,5000);}
+async function startSync(){updTeamUI();clearInterval(pollT);since=0;await poll();pollT=setInterval(poll,5000);}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();});
+
+/* sinkron tanggal, keterangan tambahan & kesimpulan (disimpan sebagai baris khusus "_rep") */
+let repT=null,repRemote=null;
+function pushRep(){
+  if(!CODE)return;
+  clearTimeout(repT);
+  repT=setTimeout(async()=>{
+    repT=null;
+    try{await api('/p/'+CODE+'/mark',{k:'_rep',s:'',n:JSON.stringify(repData()),ts:'',who:ME});setSync('✓ Tersinkron · kode: '+CODE);}
+    catch(e){setSync('⚠ Gagal mengirim kesimpulan/keterangan','var(--er)');}
+  },800);
+}
+function applyRepIfIdle(){
+  if(!repRemote||repT)return;
+  const a=document.activeElement;
+  if(a&&(a.id==='rKes'||a.id==='rTgl1'||(a.closest&&a.closest('#rNote'))))return;
+  const x=repRemote;repRemote=null;
+  if(x.n===JSON.stringify(repData()))return;
+  try{const d=JSON.parse(x.n||'{}');
+    if(d.tgl)$('rTgl1').value=d.tgl;
+    $('rKes').value=d.kes||'';
+    $('rNote').innerHTML=d.note?textToRte(d.note):'';
+    saveRepLocal();
+    $('noteInfo').textContent='↻ Diperbarui dari tim'+(x.who?' (oleh '+x.who+')':'')+'.';
+  }catch(e){}
+}
 
 /* upload Excel baru dengan kode tim terisi -> buat sesi tim kosong */
 async function hostSession(){
@@ -544,7 +575,7 @@ $('teamBtn').onclick=async()=>{
   try{await api('/p/'+CODE+'/init',{SH,fname,marks});}
   catch(e){alert('Gagal membuat sesi tim: '+e.message);CODE='';return;}
   cfg={key:'opname2:team:'+CODE,team:CODE};save();sessSave();
-  marks.forEach(m=>by[m.k]=ME);startSync();renderRooms();
+  marks.forEach(m=>by[m.k]=ME);startSync();renderRooms();pushRep();
   alert('Sesi tim dibuat dengan '+marks.length+' aset yang sudah dicek.\n\nBagikan kode ini ke teman Anda:\n'+CODE+'\n\nMereka isi nama + kode yang sama lalu klik "Gabung Sesi Tim".');
 };
 $('joinBtn').onclick=async()=>{
@@ -553,6 +584,22 @@ $('joinBtn').onclick=async()=>{
   try{const d=await api('/p/'+CODE);SH=d.SH;fname=d.fname;}
   catch(e){alert('Gagal bergabung: '+e.message);CODE='';return;}
   cfg={key:'opname2:team:'+CODE,team:CODE};st={};nt={};ts={};by={};sessSave();goRooms();startSync();
+};
+
+/* keluar dari sesi tim (data di server tidak dihapus) */
+function updTeamUI(){$('teamBtn').classList.toggle('hide',!!CODE);$('leaveBtn').classList.toggle('hide',!CODE);}
+$('leaveBtn').onclick=async()=>{
+  if(!CODE)return;
+  if(!confirm('Keluar dari sesi tim "'+CODE+'"?\n\nProgres di perangkat ini tetap tersimpan sebagai sesi sendiri. Data tim di server tidak dihapus, dan Anda bisa bergabung lagi dengan kode yang sama.'))return;
+  clearInterval(pollT);
+  const keys=Object.keys(pending);keys.forEach(k=>clearTimeout(pending[k]));pending={};
+  for(const k of keys){try{await api('/p/'+CODE+'/mark',{k,s:st[k]||'',n:nt[k]||'',ts:ts[k]||'',who:ME});}catch(e){}}
+  if(repT){clearTimeout(repT);repT=null;try{await api('/p/'+CODE+'/mark',{k:'_rep',s:'',n:JSON.stringify(repData()),ts:'',who:ME});}catch(e){}}
+  CODE='';by={};setSync('');
+  cfg={key:'opname2:'+fname+':'+SH.map(s=>s.name+s.rows.length).join('|')};
+  save();sessSave();$('teamCode').value='';
+  renderRooms();
+  alert('Anda sudah keluar dari tim. Perubahan berikutnya tidak lagi disinkronkan.');
 };
 
 showResume();
